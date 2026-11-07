@@ -2,6 +2,8 @@
 
 A **minimal** C / C++ client for [Tenzro](https://tenzro.com) nodes (chain id 13380, `0x3444`). It is not a port of the Rust SDK: it covers a handful of read-only calls, and those are tested.
 
+> **WARNING: no TLS.** This client speaks plain `http://` only and cannot reach `https://rpc.tenzro.com` or any production endpoint. It is usable today only against local or dev nodes (or behind a TLS-terminating proxy you run). Adding TLS is a known, launch-relevant gap.
+
 Status: **0.1.0, experimental.** Linux and macOS (POSIX sockets). Not tested on Windows.
 
 ## What is implemented
