@@ -1,0 +1,22 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build
+      - name: Offline tests (fake local server)
+        run: ctest --test-dir build --output-on-failure
+      # The examples need a live Tenzro node, which CI cannot reach (the dev
+      # node is on a private host; https://rpc.tenzro.com is unsupported by
+      # this http-only client), so they are built but not run here.
