@@ -1,12 +1,27 @@
 # tenzro-sdk-cpp
 
-A **minimal** C / C++ client for [Tenzro](https://tenzro.com) nodes (chain id 13380, `0x3444`). It is not a port of the Rust SDK: it covers a handful of read-only calls, and those are tested.
+The official Tenzro SDK for C and C++: a stable C ABI client for [Tenzro](https://tenzro.com) nodes, plus a header-only C++ wrapper (chain id 13380, `0x3444`).
 
-> **WARNING: no TLS.** This client speaks plain `http://` only and cannot reach `https://rpc.tenzro.com` or any production endpoint. It is usable today only against local or dev nodes (or behind a TLS-terminating proxy you run). Adding TLS is a known, launch-relevant gap.
+> **Known limitation: no TLS yet.** This client speaks plain `http://` only and cannot reach `https://rpc.tenzro.com` or any production endpoint directly. Use a local or dev node, or put a TLS-terminating proxy in front, until TLS support ships.
 
-Status: **0.1.0, experimental.** Linux and macOS (POSIX sockets). Not tested on Windows.
+## Install
 
-## What is implemented
+```sh
+cmake -S . -B build && cmake --build build
+cmake --install build --prefix /usr/local
+```
+
+## Quickstart (C++)
+
+```cpp
+#include <tenzro/client.hpp>
+tenzro::Client c("http://127.0.0.1:28545", 13380);
+if (auto id = c.chain_id()) printf("%llu\n", (unsigned long long)id.value());
+```
+
+Run the example: `./build/tenzro_basic [endpoint] [address]` (or set `TENZRO_RPC_URL`).
+
+## Methods
 
 | C function | JSON-RPC method(s) |
 |---|---|
@@ -17,61 +32,33 @@ Status: **0.1.0, experimental.** Linux and macOS (POSIX sockets). Not tested on 
 | `tenzro_get_balance` | `tenzro_getBalance` (hex string result) |
 | `tenzro_last_error`, `tenzro_status_str`, `tenzro_abi_version` | none |
 
-All of these methods are in the node's `OPEN_METHODS` list, so no auth is needed. Writes, signing, wallets, inference, identity, payments and the rest of the Rust SDK surface are **not** implemented.
+Writes, signing, wallets, inference, identity and payments are not yet implemented.
 
-**Limitations (honest list):**
-- `http://` only. `https://` endpoints (including `https://rpc.tenzro.com`) are rejected with `TENZRO_ERR_UNSUPPORTED_SCHEME`. Use a local node, or put a TLS-terminating proxy in front, until TLS support is added.
-- Chunked HTTP responses are rejected; the JSON parser is a minimal top-level scanner, not a general one.
-- A client handle is not thread-safe.
-
-## Design choice: hand-written C core, no Rust, no cbindgen
-
-The core is about 300 lines of C over POSIX sockets, with a hand-written header (`include/tenzro/tenzro.h`). Reasons: the call surface is tiny, so a Rust toolchain plus cbindgen would be a heavier dependency than the code it wraps, and the C++ consumer gets a plain `cmake` build. The cost is no TLS. If TLS or a larger surface is needed, the right move is a Rust core with cbindgen behind the same ABI.
-
-## Ownership rules (C ABI)
+### Ownership rules (C ABI)
 
 - `tenzro_client_new` returns a handle you own; free it once with `tenzro_client_free` (NULL is a no-op).
-- All results are written into caller-supplied memory. The library returns no heap memory to be freed by you.
-- `tenzro_last_error` returns a handle-owned string, valid until the next call on that handle. Do not free it.
+- All results are written into caller-supplied memory — the library returns no heap memory for you to free.
+- `tenzro_last_error` returns a handle-owned string, valid until the next call on that handle; do not free it.
 
-## Build
+### C++ wrapper
 
-```sh
-cmake -S . -B build && cmake --build build
-ctest --test-dir build        # offline tests with a fake local server
-cmake --install build --prefix /usr/local
-```
+`include/tenzro/client.hpp` (C++17) provides RAII `tenzro::Client` and a `Result<T>` (value or `Error`); `std::expected` is not used, so it builds under plain C++17.
 
-## C++ usage
+## Design: hand-written C core, no Rust, no cbindgen
 
-The header-only wrapper `include/tenzro/client.hpp` (C++17) provides RAII `tenzro::Client` and a simple `Result<T>` (value or `Error`). `std::expected` is not used so the header builds under C++17.
-
-```cpp
-#include <tenzro/client.hpp>
-tenzro::Client c("http://127.0.0.1:28545", 13380);
-if (auto id = c.chain_id()) printf("%llu\n", (unsigned long long)id.value());
-```
-
-Run the example: `./build/tenzro_basic [endpoint] [address]` (or set `TENZRO_RPC_URL`). Output against a live dev node:
-
-```
-endpoint:     http://127.0.0.1:28545
-chain id:     13380
-block number: 330
-peers:        0
-syncing:      0
-healthy:      1
-balance(0x0000000000000000000000000000000000000001) = 0x0
-```
+The core is about 300 lines of C over POSIX sockets with a hand-written header (`include/tenzro/tenzro.h`): the call surface is small enough that a Rust toolchain plus cbindgen would be heavier than the code it wraps, and the C++ side gets a plain `cmake` build. The cost is today's TLS gap above. A Rust core with cbindgen behind the same ABI is the planned path once TLS or a larger surface is needed.
 
 ## GPU Provider Kit
 
-See [docs/gpu-provider.md](docs/gpu-provider.md) and `examples/cuda/`. Documentation plus one sample; CUDA is a compute API, not a Tenzro protocol client.
+See [docs/gpu-provider.md](docs/gpu-provider.md) and `examples/cuda/` — docs plus one sample for providers serving models on NVIDIA GPUs. CUDA is a compute API, not a protocol client, so it lives here rather than as its own SDK.
 
-## Not done / stretch goals
+## Compatibility
 
-- vcpkg and Conan packaging (not wired up; no port files are shipped because none have been tested).
-- TLS, write calls, signing, Windows support.
+Built and tested on Linux x86_64 (cmake + ctest, both clean; the example runs against a live Tenzro node). macOS is in CI but not yet run; Windows is not yet supported. `http://` only (see above) — chunked HTTP responses are also rejected, and the JSON parser handles the documented methods' responses, not arbitrary JSON. A client handle is not thread-safe. vcpkg/Conan packaging isn't wired up yet.
+
+## Links
+
+[tenzro-network](https://github.com/tenzro/tenzro-network) (the protocol and node) and the other official SDKs in the [tenzro](https://github.com/tenzro) organization (TypeScript, Rust, Python, Go, Swift, Kotlin, .NET).
 
 ## License
 
